@@ -22,13 +22,21 @@ def fetch_jobs_from_jsearch(query="developer", location="Bangalore", page=1):
     if response.status_code == 200:
         jobs = []
         for item in response.json().get("data", []):
+            posted_at_str = item.get("job_posted_at_datetime_utc")
+            if posted_at_str:
+                try:
+                    posted_at = datetime.strptime(posted_at_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+                except ValueError:
+                    posted_at = datetime.now()
+            else:
+                posted_at = datetime.now()
             job = {
                 "title": item.get("job_title"),
                 "company": item.get("employer_name"),
                 "location": item.get("job_city"),
                 "region": location,
                 "description": item.get("job_description"),
-                "posted_date": datetime.strptime(item.get("job_posted_at_datetime_utc"), "%Y-%m-%dT%H:%M:%S.%fZ"),
+                "posted_date": posted_at,
                 "source": "jsearch",
                 "url": item.get("job_apply_link")
             }
