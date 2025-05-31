@@ -1,7 +1,8 @@
 import sys
 import os
 import asyncio
-
+from job_queries import QUERIES
+from datetime import datetime
 # Add root directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -19,12 +20,20 @@ async def store_jobs(query, region):
     jobs_adzuna = await loop.run_in_executor(None, fetch_jobs_from_adzuna, query, region)
     await insert_new_jobs(jobs_adzuna)
 
+
 async def insert_new_jobs(jobs):
+    today = datetime.utcnow().date()
     for job in jobs:
-        exists = await jobs_collection.find_one({"url": job["url"]})
-        if not exists:
-            await jobs_collection.insert_one(job)
+        # Upsert: update if exists, insert if not, and always set last_seen
+        result = await jobs_collection.update_one(
+            {"url": job["url"]},
+            {"$set": {**job, "last_seen": today}},
+            upsert=True
+        )
+        if result.upserted_id:
             print(f"✅ Stored: {job['title']} at {job['company']} ({job['source']})")
+        elif result.modified_count > 0:
+            print(f"🔄 Updated: {job['title']} at {job['company']} ({job['source']})")
         else:
             print(f"⚠️ Skipped (duplicate): {job['title']} ({job['source']})")
 
@@ -37,10 +46,25 @@ async def print_all_jobs(region=None):
     for job in jobs:
         print(f"📌 {job['title']} at {job['company']} [{job['source']}]")
 
+async def print_closed_jobs(region=None):
+    today = datetime.utcnow().date()
+    query = {"last_seen": {"$lt": today}}
+    if region:
+        query["region"] = region
+    closed_jobs = await jobs_collection.find(query).to_list(length=1000)
+    print(f"\n❌ Possibly closed jobs in {region or 'All Regions'}:")
+    for job in closed_jobs:
+        print(f"❌ {job['title']} at {job['company']} [{job['source']}]")
+
 if __name__ == "__main__":
     async def main():
-        await store_jobs("software", "Kerala")
-        await print_all_jobs(region="Kerala")
-        await store_jobs("software", "Bangalore")
-        await print_all_jobs(region="Bangalore")
+        for query in QUERIES:
+            await store_jobs(query, "Thrissur")
+        await print_all_jobs(region="Thrissur")
+        await print_closed_jobs(region="Thrissur")
+        for query in QUERIES:
+            await store_jobs(query, "KOCHI")
+        await print_all_jobs(region="KOCHI")
+        await print_closed_jobs(region="KOCHI")
+
     asyncio.run(main())
