@@ -39,6 +39,8 @@ async def print_all_jobs(region=None):
 
 if __name__ == "__main__":
     async def main():
-        await store_jobs("flutter developer", "Delhi")
-        await print_all_jobs(region="Delhi")
+        await store_jobs("software", "Kerala")
+        await print_all_jobs(region="Kerala")
+        await store_jobs("software", "Bangalore")
+        await print_all_jobs(region="Bangalore")
     asyncio.run(main())
