@@ -26,4 +26,4 @@ async def print_all_jobs():
 asyncio.run(print_all_jobs())
 
 if __name__ == "__main__":
-    store_jobs("flutter developer", "Delhi")
+    store_jobs("manager", "Thrissur")
