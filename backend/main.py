@@ -3,6 +3,9 @@ from database import jobs_collection
 from scripts.job_queries import QUERIES
 from scripts.fetch_all_jobs import store_jobs, print_all_jobs
 import asyncio
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from routes import jobs 
 
 from contextlib import asynccontextmanager
 
