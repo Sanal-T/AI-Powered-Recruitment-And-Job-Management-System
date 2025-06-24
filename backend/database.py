@@ -13,4 +13,3 @@ async def insert_test():
     result = await db.jobs.insert_one({"test": "value"})
     print("Inserted:", result.inserted_id)
 
-asyncio.run(insert_test())
