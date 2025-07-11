@@ -1,3 +1,5 @@
 # AI POWERED RECRUITMENT AND JOB MANAGEMENT SYSTEM 
 
-techs used :
+techs used : 
+FastAPI
+React.js
