@@ -2,5 +2,5 @@
 
 techs used : 
 FastAPI
-React.j
+React.js
 
