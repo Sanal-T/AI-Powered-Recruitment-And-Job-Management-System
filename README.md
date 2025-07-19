@@ -3,4 +3,5 @@
 techs used : 
 FastAPI
 React.js
+MongoDb
 
