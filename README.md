@@ -4,4 +4,4 @@ techs used :
 FastAPI
 React.js
 MongoDb
-
+MEARN STACK
