@@ -6,4 +6,3 @@ React.js
 MongoDb
 MEARN STACK
 Express.js
-
