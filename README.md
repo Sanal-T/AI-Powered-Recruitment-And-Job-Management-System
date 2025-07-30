@@ -1,5 +1,5 @@
 # AI POWERED RECRUITMENT AND JOB MANAGEMENT SYSTEM  
-
+ 
 techs used : 
 FastAPI
 React.js
