@@ -3,6 +3,6 @@
 techs used : 
 FastAPI
 React.js
-MongoDb
+MongoDb 
 MEARN STACK
 Express.js
