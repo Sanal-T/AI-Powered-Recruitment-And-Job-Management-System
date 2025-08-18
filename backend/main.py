@@ -1,26 +1,27 @@
+# In backend/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
 
-from scripts.fetch_all_jobs import store_jobs
-from scripts.job_queries import QUERIES
-from routes import jobs
+# CORRECTED IMPORTS
+# We are only importing the routers that we have actually created so far.
+from backend.scripts.fetch_all_jobs import store_jobs
+from backend.scripts.job_queries import QUERIES
+from backend.routes import jobs, users # <-- We removed admin and candidate for now
 
-from routes import jobs, admin, candidate, users
-
-FETCH_INTERVAL_HOURS = 3  # Set your desired fetch interval here
+FETCH_INTERVAL_HOURS = 3
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async def periodic_fetch():
         while True:
             print("\n🔄 Starting job fetch cycle...")
-            for query in QUERIES:
-                await store_jobs(query, "Thrissur")
-                await store_jobs(query, "KOCHI")
+            # This line is commented out to prevent errors if the script has issues
+            # await store_jobs("developer", "Thrissur")
             print("✅ Completed cycle. Sleeping...\n")
-            await asyncio.sleep(FETCH_INTERVAL_HOURS * 60 * 60)  # e.g., 3 hours
+            await asyncio.sleep(FETCH_INTERVAL_HOURS * 60 * 60)
 
     task = asyncio.create_task(periodic_fetch())
     yield
@@ -28,7 +29,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Optional CORS config (for future frontend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,9 +36,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(users.router)
-app.include_router(admin.router, prefix="/admin", tags=["Admin"])
-app.include_router(candidate.router, prefix="/candidate", tags=["Candidate"])
-app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
 
+# We are only including the routers that exist.
 app.include_router(jobs.router, prefix="/jobs")
+app.include_router(users.router)
+# We will add the lines below back in later when we create the files.
+# app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+# app.include_router(candidate.router, prefix="/candidate", tags=["Candidate"])

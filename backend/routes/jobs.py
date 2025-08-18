@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Query
 from typing import List
-from database import jobs_collection
-from models import Job
+from backend.database import jobs_collection
+from backend.models import Job
+# Assuming remotive_scraper is in a 'scraper' folder inside 'backend'
+from backend.scraper.remotive_scraper import fetch_remotive_jobs
 import datetime
-from scraper.remotive_scraper import fetch_remotive_jobs
 
 router = APIRouter()
 

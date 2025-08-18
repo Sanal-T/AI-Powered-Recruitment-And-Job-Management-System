@@ -57,13 +57,29 @@
         // --- SIMULATED API LAYER ---
         // These functions mimic fetching data from your FastAPI backend.
         const api = {
-            login: async (username, password, role) => {
-                console.log(`Attempting login for: ${username}, role: ${role}`);
-                const user = MOCK_USERS.find(u => u.username === username && u.password === password && u.role === role);
-                if (user) {
-                    return { access_token: `fake-token-for-${user._id}`, role: user.role, userId: user._id };
-                }
-                throw new Error("Invalid credentials");
+        login: async (username, password, role) => {
+        const API_URL = "http://127.0.0.1:8000"; // This is the address of your backend
+
+        // FastAPI's login form expects data in a specific format, not JSON.
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        const response = await fetch(`${API_URL}/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to log in. Check username/password.");
+        }
+
+        const data = await response.json(); // This will contain the access_token
+
+            // We also need to know the user's role and username for the UI
+            // The token itself contains this, but for simplicity, we'll just add it here.
+            return { ...data, role, username };
             },
             getAdminJobs: async (token, searchTerm = '') => {
                 console.log(`Fetching admin jobs with search: ${searchTerm}`);
