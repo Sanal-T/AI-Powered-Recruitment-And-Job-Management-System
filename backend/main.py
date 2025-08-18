@@ -7,6 +7,8 @@ from scripts.fetch_all_jobs import store_jobs
 from scripts.job_queries import QUERIES
 from routes import jobs
 
+from routes import jobs, admin, candidate, users
+
 FETCH_INTERVAL_HOURS = 3  # Set your desired fetch interval here
 
 @asynccontextmanager
@@ -34,5 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(users.router)
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(candidate.router, prefix="/candidate", tags=["Candidate"])
+app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
 
 app.include_router(jobs.router, prefix="/jobs")
