@@ -23,6 +23,27 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -31,154 +52,224 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- MOCK API LAYER for ADMIN ---
-        const MOCK_JOBS = [
-            { _id: '1', title: 'Software Engineer', company: 'Tech Corp', location: 'San Francisco', description: 'Develop amazing software.', salary: '$120,000', url: 'https://apply.example.com/1' },
-            { _id: '2', title: 'Product Manager', company: 'Innovate LLC', location: 'New York', description: 'Manage product lifecycle.', salary: '$130,000', url: 'https://apply.example.com/2' },
-            { _id: '3', title: 'UX Designer', company: 'Creative Inc', location: 'Remote', description: 'Design beautiful interfaces.', salary: '$110,000', url: 'https://apply.example.com/3' },
-            { _id: '4', title: 'Data Scientist', company: 'DataDriven Co', location: 'Austin', description: 'Analyze complex datasets.', salary: '$140,000', url: 'https://apply.example.com/4' },
-        ];
-        
-        const MOCK_STARRED_JOBS = [{ userId: 'test-user-1', jobId: '2' }, { userId: 'test-user-2', jobId: '4' }];
+        // --- REAL API LAYER for ADMIN ---
+        const API_URL = "http://127.0.0.1:8000";
+        // Using the token you provided.
+        const AUTH_TOKEN ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTc1NTc5MjY2M30.Vl0TrSJWkVOGNMRcfu6JnwPiau3h9LRZ1h04lY47wtM";
 
         const api = {
             getAdminJobs: async (token, searchTerm = '') => {
-                console.log("MOCK: Fetching admin jobs...");
-                return MOCK_JOBS.filter(job => job.title.toLowerCase().includes(searchTerm.toLowerCase()));
+                const response = await fetch(`${API_URL}/admin/jobs?search=${encodeURIComponent(searchTerm)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error("Failed to fetch admin jobs");
+                return response.json();
             },
             getAdminStarredJobs: async (token) => {
-                console.log("MOCK: Fetching admin starred jobs...");
-                return MOCK_STARRED_JOBS.map(sj => ({
-                    job: MOCK_JOBS.find(j => j._id === sj.jobId),
-                    user: `candidate_${sj.userId}@test.com`
-                }));
+                const response = await fetch(`${API_URL}/admin/starred-jobs`, {
+                     headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error("Failed to fetch starred jobs");
+                return response.json();
+            },
+            analyzeJobWithGemini: async (description) => {
+                const apiKey = ""; // Handled by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                const prompt = `Based on the following job description, provide a JSON object with two keys: 
+                1. "summary": A concise one-paragraph summary of the role.
+                2. "skills": An array of the top 5-7 most important skills or technologies mentioned.
+
+                Job Description:
+                "${description}"`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                summary: { type: "STRING" },
+                                skills: {
+                                    type: "ARRAY",
+                                    items: { type: "STRING" }
+                                }
+                            }
+                        }
+                    }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text;
+                return JSON.parse(text);
             }
         };
 
         // --- COMPONENTS ---
 
-        function SearchBar({ onSearch }) {
-            const [term, setTerm] = useState('');
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                onSearch(term);
-            };
+        const SearchIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5 text-gray-500"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        );
+
+        const StarIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-500 h-6 w-6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        );
+
+        function JobAnalysisModal({ job, onClose }) {
+            const [analysis, setAnalysis] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                if (job) {
+                    setLoading(true);
+                    setError(null);
+                    api.analyzeJobWithGemini(job.description)
+                        .then(data => setAnalysis(data))
+                        .catch(err => {
+                            console.error("Gemini API error:", err);
+                            setError("Could not analyze job description.");
+                        })
+                        .finally(() => setLoading(false));
+                }
+            }, [job]);
+
+            if (!job) return null;
+
             return (
-                <form onSubmit={handleSubmit} className="mb-6">
-                    <div className="relative">
-                        <input type="text" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search by job title or description..." className="w-full p-3 pl-10 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        <svg className="w-5 h-5 text-gray-400 absolute top-3.5 left-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-2xl font-bold">{job.title}</h2>
+                            <button onClick={onClose} className="text-2xl font-bold">&times;</button>
+                        </div>
+                        <div className="mb-6">
+                            <h3 className="text-lg font-semibold mb-2 text-gray-700">Full Description</h3>
+                            <p className="text-gray-600 bg-gray-50 p-3 rounded-md">{job.description}</p>
+                        </div>
+                        <hr className="my-4" />
+                        <div>
+                            <h3 className="text-xl font-semibold mb-3 text-gray-800">✨ AI Analysis</h3>
+                            {loading && <div className="loader mx-auto"></div>}
+                            {error && <p className="text-red-500">{error}</p>}
+                            {analysis && (
+                                <div>
+                                    <div className="mb-4">
+                                        <h4 className="font-semibold text-gray-700">Summary</h4>
+                                        <p className="text-gray-600">{analysis.summary}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-700">Key Skills</h4>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {analysis.skills.map(skill => (
+                                                <span key={skill} className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">{skill}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </form>
-            );
-        }
-
-        function AdminJobList({ jobs }) {
-            return (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                    <table className="min-w-full leading-normal">
-                        <thead>
-                            <tr className="bg-gray-200 text-gray-600 uppercase text-sm">
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Title</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Company</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Location</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Salary</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Link</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {jobs.map(job => (
-                                <tr key={job._id} className="border-b border-gray-200 hover:bg-gray-100">
-                                    <td className="px-5 py-4 font-medium text-gray-800">{job.title}</td>
-                                    <td className="px-5 py-4">{job.company}</td>
-                                    <td className="px-5 py-4">{job.location}</td>
-                                    <td className="px-5 py-4">{job.salary || 'N/A'}</td>
-                                    <td className="px-5 py-4">
-                                        <a href={job.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Apply</a>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            );
-        }
-
-        function AdminStarredList({ starredJobs }) {
-             return (
-                <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                    <table className="min-w-full leading-normal">
-                        <thead>
-                            <tr className="bg-gray-200 text-gray-600 uppercase text-sm">
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Job Title</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Company</th>
-                                <th className="px-5 py-3 border-b-2 border-gray-200 text-left">Starred By</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {starredJobs.map((item, index) => (
-                                <tr key={index} className="border-b border-gray-200 hover:bg-gray-100">
-                                    <td className="px-5 py-4 font-medium text-gray-800">{item.job.title}</td>
-                                    <td className="px-5 py-4">{item.job.company}</td>
-                                    <td className="px-5 py-4">{item.user}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
                 </div>
             );
         }
 
         // --- DASHBOARD PAGE ---
         function AdminDashboard() {
-            const [view, setView] = useState('all');
             const [jobs, setJobs] = useState([]);
             const [starredJobs, setStarredJobs] = useState([]);
-            const [loading, setLoading] = useState(false);
-            const FAKE_AUTH_TOKEN = "admin-token";
-
-            const fetchData = async (searchTerm = '') => {
-                setLoading(true);
-                try {
-                    const jobsData = await api.getAdminJobs(FAKE_AUTH_TOKEN, searchTerm);
-                    setJobs(jobsData);
-                } catch (error) {
-                    console.error("Failed to fetch admin jobs", error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            
-            const fetchStarredData = async () => {
-                setLoading(true);
-                try {
-                    const starredData = await api.getAdminStarredJobs(FAKE_AUTH_TOKEN);
-                    setStarredJobs(starredData);
-                } catch (error) {
-                    console.error("Failed to fetch admin starred data", error);
-                } finally {
-                    setLoading(false);
-                }
-            }
+            const [searchTerm, setSearchTerm] = useState("");
+            const [selectedJob, setSelectedJob] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
 
             useEffect(() => {
-                if (view === 'all') {
-                    fetchData();
-                } else {
-                    fetchStarredData();
-                }
-            }, [view]);
+                setLoading(true);
+                setError(null);
+                Promise.all([
+                    api.getAdminJobs(AUTH_TOKEN, searchTerm),
+                    api.getAdminStarredJobs(AUTH_TOKEN)
+                ]).then(([jobsData, starredData]) => {
+                    setJobs(jobsData);
+                    setStarredJobs(starredData);
+                }).catch(err => {
+                    console.error("Failed to fetch data:", err);
+                    setError("Could not load data. Please ensure the backend server is running and you have a valid token.");
+                }).finally(() => {
+                    setLoading(false);
+                });
+            }, [searchTerm]);
 
             return (
-                <div>
-                    <h1 className="text-3xl font-bold mb-4">Admin Dashboard</h1>
-                    <div className="flex space-x-4 mb-6 border-b">
-                        <button onClick={() => setView('all')} className={`py-2 px-4 text-lg ${view === 'all' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500'}`}>All Jobs</button>
-                        <button onClick={() => setView('starred')} className={`py-2 px-4 text-lg ${view === 'starred' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500'}`}>Starred by Applicants</button>
+                <div className="p-6">
+                    <JobAnalysisModal job={selectedJob} onClose={() => setSelectedJob(null)} />
+                    
+                    <div className="flex items-center mb-6 border-b pb-4">
+                        <SearchIcon />
+                        <input
+                            type="text"
+                            placeholder="Search jobs..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="p-2 border rounded-md w-full"
+                        />
                     </div>
-                    {view === 'all' && <SearchBar onSearch={fetchData} />}
+                    
+                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
+                    
                     {loading ? <div className="loader mx-auto"></div> : (
-                        view === 'all' ? <AdminJobList jobs={jobs} /> : <AdminStarredList starredJobs={starredJobs} />
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Job List Column */}
+                            <div className="lg:col-span-2">
+                                <h2 className="text-2xl font-semibold mb-4">All Jobs</h2>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {jobs.map((job) => (
+                                        <div key={job._id} className="bg-white p-4 rounded-lg shadow-md border hover:shadow-lg transition-shadow">
+                                            <h3 className="font-bold text-lg">{job.title}</h3>
+                                            <p className="text-sm text-gray-600">{job.company}</p>
+                                            <p className="text-xs text-gray-500 mb-3">{job.location}</p>
+                                            <button
+                                                className="w-full bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600 text-sm"
+                                                onClick={() => setSelectedJob(job)}
+                                            >
+                                                Analyze Job ✨
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Starred Jobs Column */}
+                            <div>
+                                <h2 className="text-2xl font-semibold mb-4">⭐ Starred Jobs</h2>
+                                <div className="grid gap-4">
+                                    {starredJobs.map((item, idx) => (
+                                        <div key={idx} className="bg-white p-4 rounded-lg shadow-md border">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="font-bold">{item.job.title}</h3>
+                                                    <p className="text-xs text-gray-500">
+                                                        Starred by: {item.user}
+                                                    </p>
+                                                </div>
+                                                <StarIcon />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             );
@@ -191,7 +282,7 @@
                     <nav className="bg-white shadow-md p-4 flex justify-between items-center">
                         <h1 className="text-xl font-bold text-gray-800">Job Portal - Admin View</h1>
                     </nav>
-                    <main className="p-8">
+                    <main>
                         <AdminDashboard />
                     </main>
                 </div>
