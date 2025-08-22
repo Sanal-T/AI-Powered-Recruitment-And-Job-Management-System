@@ -55,7 +55,7 @@
         // --- REAL API LAYER for ADMIN ---
         const API_URL = "http://127.0.0.1:8000";
         // Using the token you provided.
-        const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTc1NTc5OTk4MH0.7jGJO8UWsVchZ4wlGyixsL0JVG8BqmfEfZF2CBvv3vE";
+        const AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTc1NTg4MzkzMX0.bEO4tvkpgCdgVRcCeX3YE1acL6aj_dHJm6pLiMGUdu4";
 
 
         const api = {
@@ -75,7 +75,7 @@
             },
             analyzeJobWithGemini: async (description) => {
                 const apiKey = ""; // Handled by the environment
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
                 
                 const prompt = `Based on the following job description, provide a JSON object with two keys: 
                 1. "summary": A concise one-paragraph summary of the role.
@@ -88,16 +88,6 @@
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
                         responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                summary: { type: "STRING" },
-                                skills: {
-                                    type: "ARRAY",
-                                    items: { type: "STRING" }
-                                }
-                            }
-                        }
                     }
                 };
 
@@ -236,16 +226,33 @@
                                 <h2 className="text-2xl font-semibold mb-4">All Jobs</h2>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {jobs.map((job) => (
-                                        <div key={job._id} className="bg-white p-4 rounded-lg shadow-md border hover:shadow-lg transition-shadow">
-                                            <h3 className="font-bold text-lg">{job.title}</h3>
-                                            <p className="text-sm text-gray-600">{job.company}</p>
-                                            <p className="text-xs text-gray-500 mb-3">{job.location}</p>
-                                            <button
-                                                className="w-full bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600 text-sm"
-                                                onClick={() => setSelectedJob(job)}
-                                            >
-                                                Analyze Job ✨
-                                            </button>
+                                        <div key={job._id} className="bg-white p-4 rounded-lg shadow-md border hover:shadow-lg transition-shadow flex flex-col">
+                                            <div className="flex-grow">
+                                                <h3 className="font-bold text-lg">{job.title}</h3>
+                                                <p className="text-sm text-gray-600">{job.company}</p>
+                                                <p className="text-xs text-gray-500 mb-3">{job.location}</p>
+                                            </div>
+                                            
+                                            {/* --- START: UPDATED BUTTONS SECTION --- */}
+                                            <div className="mt-4 flex items-center gap-2">
+                                                <button
+                                                    className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600 text-sm"
+                                                    onClick={() => setSelectedJob(job)}
+                                                >
+                                                    Analyze Job ✨
+                                                </button>
+                                                {/* --- ADDED THIS LINK, STYLED AS A BUTTON --- */}
+                                                <a
+                                                    href={job.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex-1 bg-gray-500 text-white px-3 py-2 rounded-md hover:bg-gray-600 text-sm text-center"
+                                                >
+                                                    View Posting
+                                                </a>
+                                            </div>
+                                            {/* --- END: UPDATED BUTTONS SECTION --- */}
+
                                         </div>
                                     ))}
                                 </div>
