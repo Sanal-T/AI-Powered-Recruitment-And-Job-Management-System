@@ -4,6 +4,13 @@ from datetime import datetime
 ADZUNA_APP_ID = "4f48fc15"
 ADZUNA_APP_KEY = "209c64876108b7c26edec1509944fed3"
 
+# In backend/external/adzuna_client.py
+import requests
+from datetime import datetime
+
+ADZUNA_APP_ID = "4f48fc15"
+ADZUNA_APP_KEY = "209c64876108b7c26edec1509944fed3"
+
 def fetch_jobs_from_adzuna(query="developer", location="Bangalore", results=20):
     url = f"https://api.adzuna.com/v1/api/jobs/in/search/1"
     params = {
@@ -21,6 +28,18 @@ def fetch_jobs_from_adzuna(query="developer", location="Bangalore", results=20):
         data = response.json()
         jobs = []
         for item in data.get("results", []):
+            
+            # --- START: NEW SALARY LOGIC ---
+            salary_min = item.get("salary_min")
+            salary_max = item.get("salary_max")
+            salary_string = None
+            
+            if salary_min and salary_max:
+                salary_string = f"₹{int(salary_min):,} - ₹{int(salary_max):,} a year"
+            elif salary_min:
+                salary_string = f"From ₹{int(salary_min):,} a year"
+            # --- END: NEW SALARY LOGIC ---
+
             job = {
                 "title": item.get("title"),
                 "company": item.get("company", {}).get("display_name"),
@@ -29,7 +48,8 @@ def fetch_jobs_from_adzuna(query="developer", location="Bangalore", results=20):
                 "description": item.get("description"),
                 "posted_date": datetime.strptime(item["created"], "%Y-%m-%dT%H:%M:%SZ"),
                 "source": "adzuna",
-                "url": item.get("redirect_url")
+                "url": item.get("redirect_url"),
+                "salary": salary_string # <-- ADDED SALARY FIELD
             }
             jobs.append(job)
         return jobs

@@ -37,3 +37,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+# Add this class to backend/models.py
+class StarRequest(BaseModel):
+    job_id: str

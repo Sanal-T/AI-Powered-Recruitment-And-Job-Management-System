@@ -54,13 +54,14 @@ def standardize_job_from_remotive(job, region):
     return {
         "title": job.get("title", "No title"),
         "company": job.get("company_name", "Unknown"),
-        "location": job.get("candidate_required_location", "Remote"),
+        "location": job.get("Thrissur", "Remote"),
         "description": job.get("description", ""),
         "url": job.get("url", ""),
         "tags": job.get("tags", []),
         "job_type": job.get("job_type", "Unknown"),
         "region": region,
-        "posted_date": posted_date
+        "posted_date": posted_date,
+        "salary": job.get("salary")
     }
 
 async def insert_new_jobs(jobs):
@@ -84,15 +85,21 @@ async def print_all_jobs(region=None):
     print(f"\n🧾 Jobs in {region or 'All Regions'}:")
     for job in jobs:
         print(f"📌 {job.get('title', 'No title')} at {job.get('company', 'Unknown')} [{job.get('source', 'Unknown')}]")
+# At the bottom of backend/scripts/fetch_all_jobs.py
 
 if __name__ == "__main__":
-    async def main():
-        for query in QUERIES:
-            await store_jobs(query, "Thrissur")
-        await print_all_jobs(region="Thrissur")
+    # --- Define all the locations you want to fetch here ---
+    LOCATIONS_TO_FETCH = ["Thrissur", "Kochi", "Ernakulam"]
 
-        for query in QUERIES:
-            await store_jobs(query, "KOCHI")
-        await print_all_jobs(region="KOCHI")
+    async def main():
+        # This new loop will run the search for each location in your list
+        for location in LOCATIONS_TO_FETCH:
+            print(f"\n=================================================")
+            print(f"   STARTING FETCH FOR LOCATION: {location.upper()}   ")
+            print(f"=================================================\n")
+            for query in QUERIES:
+                await store_jobs(query, location)
+            
+            await print_all_jobs(region=location)
 
     asyncio.run(main())

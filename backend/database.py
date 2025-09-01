@@ -13,3 +13,5 @@ async def insert_test():
     result = await db.jobs.insert_one({"test": "value"})
     print("Inserted:", result.inserted_id)
 
+# Add this line to backend/database.py
+starred_jobs_collection = db.starred_jobs
