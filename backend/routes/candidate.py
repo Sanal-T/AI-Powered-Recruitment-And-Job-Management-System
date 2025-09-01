@@ -41,19 +41,24 @@ async def star_a_job(star_request: models.StarRequest, current_user: dict = Depe
 
 # 2. Endpoint to GET all starred jobs for the user
 @router.get("/starred-jobs", response_model=List[models.Job])
+# In backend/routes/candidate.py
+
+@router.get("/starred-jobs", response_model=List[models.Job])
 async def get_starred_jobs(current_user: dict = Depends(get_current_user)):
     username = current_user["username"]
 
-    # Find all job_ids the user has starred
     starred_entries = await starred_jobs_collection.find({"username": username}).to_list(length=None)
     job_ids = [ObjectId(entry["job_id"]) for entry in starred_entries]
 
     if not job_ids:
         return []
 
-    # Fetch the full job details for those IDs
     jobs_cursor = jobs_collection.find({"_id": {"$in": job_ids}})
-    return await jobs_cursor.to_list(length=None)
+
+    # --- FIX: Convert raw DB data to Pydantic models before returning ---
+    jobs_list = await jobs_cursor.to_list(length=None)
+    validated_jobs = [models.Job(**job) for job in jobs_list]
+    return validated_jobs
 
 # 3. Endpoint to UNSTAR a job
 @router.delete("/starred-jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)

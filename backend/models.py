@@ -41,3 +41,8 @@ class TokenData(BaseModel):
 # Add this class to backend/models.py
 class StarRequest(BaseModel):
     job_id: str
+
+# Add this class to the bottom of backend/models.py
+class StarredJobResponse(BaseModel):
+    user: str
+    job: Job

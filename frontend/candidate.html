@@ -52,7 +52,7 @@ const api = {
            body: JSON.stringify({ job_id: jobId }),
            headers: { 
                'Content-Type': 'application/json',
-               'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzI1NTUzfQ.EHn_HC-o55RIO1f0CNhhwWcDlYLsuxCQhU0opAqThkQ"}` 
+               'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzQ2NDgxfQ.xlWZoQUdUYiz-ndIcpI06AlM7w9miOvKLgK2f995C5w"}` 
             }
         });
         return { status: 'ok' };
@@ -61,14 +61,14 @@ const api = {
     unstarJob: async (jobId) => {
         await fetch(`${API_URL}/candidate/starred-jobs/${jobId}`, { 
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzI1NTUzfQ.EHn_HC-o55RIO1f0CNhhwWcDlYLsuxCQhU0opAqThkQ"}` }
+            headers: { 'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzQ2NDgxfQ.xlWZoQUdUYiz-ndIcpI06AlM7w9miOvKLgK2f995C5w"}` }
         });
         return { status: 'ok' };
     },
 
     getCandidateStarredJobs: async () => {
         const response = await fetch(`${API_URL}/candidate/starred-jobs`, {
-            headers: { 'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzI1NTUzfQ.EHn_HC-o55RIO1f0CNhhwWcDlYLsuxCQhU0opAqThkQ"}` }
+            headers: { 'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzQ2NDgxfQ.xlWZoQUdUYiz-ndIcpI06AlM7w9miOvKLgK2f995C5w"}` }
         });
         if (!response.ok) {
             console.error("Failed to fetch starred jobs");
@@ -170,13 +170,13 @@ const api = {
             const handleStar = async (jobId) => {
                 await api.starJob(jobId);
                 // In a real app, refetching would update the UI
-                // fetchData(); 
+                fetchData(); 
             };
 
             const handleUnstar = async (jobId) => {
                 await api.unstarJob(jobId);
                 // In a real app, refetching would update the UI
-                // fetchData();
+                fetchData();
             };
 
             const starredJobIds = new Set(starredJobs.map(j => j._id));
