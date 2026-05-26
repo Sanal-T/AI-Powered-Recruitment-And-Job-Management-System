@@ -41,9 +41,6 @@ async def star_a_job(star_request: models.StarRequest, current_user: dict = Depe
 
 # 2. Endpoint to GET all starred jobs for the user
 @router.get("/starred-jobs", response_model=List[models.Job])
-# In backend/routes/candidate.py
-
-@router.get("/starred-jobs", response_model=List[models.Job])
 async def get_starred_jobs(current_user: dict = Depends(get_current_user)):
     username = current_user["username"]
 

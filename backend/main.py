@@ -8,8 +8,7 @@ import asyncio
 # CORRECTED IMPORTS
 from backend.scripts.fetch_all_jobs import store_jobs
 from backend.scripts.job_queries import QUERIES
-from backend.routes import jobs, users, admin # <-- Make sure 'admin' is imported
-from backend.routes import jobs, users, admin, candidate # <-- Add 'candidate' here
+from backend.routes import jobs, users, admin, candidate
 
 FETCH_INTERVAL_HOURS = 3
 

@@ -83,7 +83,4 @@ async def get_all_starred_jobs(current_user: dict = Depends(get_current_admin_us
     # --- FIX: Convert raw DB data to Pydantic models before returning ---
     results = await starred_jobs_cursor.to_list(length=None)
     validated_results = [models.StarredJobResponse(**res) for res in results]
-    return validated_results
-
-    starred_jobs_cursor = starred_jobs_collection.aggregate(pipeline)
-    return await starred_jobs_cursor.to_list(length=None)
+    return validated_results
