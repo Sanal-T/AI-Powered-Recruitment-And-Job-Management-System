@@ -12,11 +12,30 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async def periodic_fetch():
+        POPULAR_QUERIES = [
+            "Software Engineer",
+            "Data Analyst",
+            "Full Stack Developer",
+            "Graphic Designer",
+            "Marketing Executive",
+            "Accountant",
+            "DevOps Engineer",
+            "Product Manager"
+        ]
+        # Delay initial run slightly to let dev server spin up cleanly
+        await asyncio.sleep(10)
         while True:
-            for query in QUERIES:
-                await store_jobs(query, "Thrissur")
-                await store_jobs(query, "KOCHI")
-            await asyncio.sleep(3 * 60 * 60)  # 3 hours
+            print("🚀 Starting background job fetching for curated popular terms...")
+            for query in POPULAR_QUERIES:
+                try:
+                    await store_jobs(query, "Thrissur")
+                    await asyncio.sleep(5)  # Rest between regions/queries
+                    await store_jobs(query, "KOCHI")
+                    await asyncio.sleep(5)
+                except Exception as e:
+                    print(f"Error in background fetch for query '{query}': {e}")
+            print("😴 Background job fetching complete. Sleeping for 12 hours.")
+            await asyncio.sleep(12 * 60 * 60)  # 12 hours
     task = asyncio.create_task(periodic_fetch())
     yield
     task.cancel()

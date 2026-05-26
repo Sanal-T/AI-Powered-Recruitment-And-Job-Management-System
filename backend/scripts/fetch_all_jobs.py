@@ -38,7 +38,7 @@ def standardize_job(job, region, source):
         "tags": job.get("tags", []),
         "job_type": job.get("job_type", "Unknown"),
         "region": region,
-        #"source": source,
+        "source": source,
         "posted_date": job.get("posted_date", datetime.datetime.utcnow())
     }
 
@@ -60,6 +60,7 @@ def standardize_job_from_remotive(job, region):
         "tags": job.get("tags", []),
         "job_type": job.get("job_type", "Unknown"),
         "region": region,
+        "source": "Remotive",
         "posted_date": posted_date
     }
 
