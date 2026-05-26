@@ -1,13 +1,17 @@
-from fastapi import FastAPI, BackgroundTasks
-from database import jobs_collection
-from scripts.job_queries import QUERIES
-from scripts.fetch_all_jobs import store_jobs, print_all_jobs
-import asyncio
+# In backend/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import jobs 
-
 from contextlib import asynccontextmanager
+import asyncio
+
+# CORRECTED IMPORTS
+from backend.scripts.fetch_all_jobs import store_jobs
+from backend.scripts.job_queries import QUERIES
+from backend.routes import jobs, users, admin # <-- Make sure 'admin' is imported
+from backend.routes import jobs, users, admin, candidate # <-- Add 'candidate' here
+
+FETCH_INTERVAL_HOURS = 3
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,19 +45,26 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 app = FastAPI(lifespan=lifespan)
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5500",  # Add this for Live Server
+    "http://127.0.0.1:5500",   # And this one to be safe
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend
+    allow_origins=origins, # Use the specific list
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(jobs.router, prefix="/jobs")
-@app.get("/jobs")
-async def get_jobs(region: str = None):
-    query = {}
-    if region:
-        query["region"] = region
-    jobs = await jobs_collection.find(query).to_list(length=1000)
-    return jobs
+# We are now including the admin router.
+app.include_router(users.router, tags=["Authentication"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"]) # <-- This line is now active
+app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
+app.include_router(candidate.router, prefix="/candidate", tags=["Candidate"]) 
+
+# The candidate router remains commented out until we build it.
+# app.include_router(candidate.router, prefix="/candidate", tags=["Candidate"])

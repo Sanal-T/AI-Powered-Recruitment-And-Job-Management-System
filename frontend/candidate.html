@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+// --- REAL API LAYER for CANDIDATE ---
+const API_URL = "http://127.0.0.1:8000";
+// PASTE THE TOKEN YOU GENERATED FOR THE 'candidate' USER HERE
+const CANDIDATE_AUTH_TOKEN = "your-candidate-token-goes-here"; 
+
+const api = {
+    getCandidateJobs: async (searchTerm = '') => {
+        const response = await fetch(`${API_URL}/jobs/?search=${encodeURIComponent(searchTerm)}`); 
+        if (!response.ok) {
+            console.error("Failed to fetch jobs from backend");
+            return [];
+        }
+        return response.json();
+    },
+
+    starJob: async (jobId) => {
+        await fetch(`${API_URL}/candidate/starred-jobs`, { 
+           method: 'POST', 
+           body: JSON.stringify({ job_id: jobId }),
+           headers: { 
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzQ2NDgxfQ.xlWZoQUdUYiz-ndIcpI06AlM7w9miOvKLgK2f995C5w"}` 
+            }
+        });
+        return { status: 'ok' };
+    },
+
+    unstarJob: async (jobId) => {
+        await fetch(`${API_URL}/candidate/starred-jobs/${jobId}`, { 
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzQ2NDgxfQ.xlWZoQUdUYiz-ndIcpI06AlM7w9miOvKLgK2f995C5w"}` }
+        });
+        return { status: 'ok' };
+    },
+
+    getCandidateStarredJobs: async () => {
+        const response = await fetch(`${API_URL}/candidate/starred-jobs`, {
+            headers: { 'Authorization': `Bearer ${"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kaWRhdGUiLCJyb2xlIjoiY2FuZGlkYXRlIiwiZXhwIjoxNzU2NzQ2NDgxfQ.xlWZoQUdUYiz-ndIcpI06AlM7w9miOvKLgK2f995C5w"}` }
+        });
+        if (!response.ok) {
+            console.error("Failed to fetch starred jobs");
+            return [];
+        }
+        return response.json();
+    }
+};
+
+        // --- COMPONENTS ---
+
+        const InfoIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400 hover:text-gray-600">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+        );
+
+        function SearchBar({ onSearch }) {
+            const [term, setTerm] = useState('');
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSearch(term);
+            };
+            return (
+                <form onSubmit={handleSubmit} className="mb-6">
+                    <div className="relative">
+                        <input type="text" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Search by job title..." className="w-full p-3 pl-10 text-gray-700 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <svg className="w-5 h-5 text-gray-400 absolute top-3.5 left-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                </form>
+            );
+        }
+
+        function JobCard({ job, onStar, onUnstar, isStarred }) {
+            // State to manage if the description is expanded or not
+            const [isExpanded, setIsExpanded] = useState(false);
+
+            const descriptionToShow = isExpanded 
+                ? job.description 
+                : `${job.description.substring(0, 100)}...`;
+
+            return (
+                <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-800">{job.title}</h3>
+                            {/* Company Name is now removed */}
+                            <p className="text-gray-500 text-sm">{job.location}</p>
+                        </div>
+                        <button onClick={() => isStarred ? onUnstar(job._id) : onStar(job._id)} className="text-3xl text-yellow-400 hover:text-yellow-500 transition-colors">
+                            {isStarred ? '★' : '☆'}
+                        </button>
+                    </div>
+                    <p className="text-green-600 font-semibold my-2">{job.salary || 'Salary not specified'}</p>
+                    
+                    {/* Collapsible Description Section */}
+                    <div className="text-gray-700 mt-2 flex-grow text-sm">
+                        <p>{descriptionToShow}</p>
+                        {job.description.length > 100 && (
+                            <button onClick={() => setIsExpanded(!isExpanded)} className="mt-2 font-semibold text-blue-600 hover:underline">
+                                {isExpanded ? 'Show Less' : 'Show More'}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Apply Now button is now removed */}
+                </div>
+            );
+        }
+
+        // --- DASHBOARD PAGE ---
+        function CandidateDashboard() {
+            const [view, setView] = useState('all');
+            const [jobs, setJobs] = useState([]);
+            const [starredJobs, setStarredJobs] = useState([]);
+            const [loading, setLoading] = useState(false);
+
+            const fetchData = async (searchTerm = '') => {
+                setLoading(true);
+                try {
+                    // Only fetch all jobs for now, as starred jobs backend doesn't exist yet
+                    const jobsData = await api.getCandidateJobs(searchTerm);
+                    const starredData = await api.getCandidateStarredJobs();
+                    setJobs(jobsData);
+                    setStarredJobs(starredData);
+                } catch (error) {
+                    console.error("Failed to fetch candidate data", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchData();
+            }, []);
+
+            const handleStar = async (jobId) => {
+                await api.starJob(jobId);
+                // In a real app, refetching would update the UI
+                fetchData(); 
+            };
+
+            const handleUnstar = async (jobId) => {
+                await api.unstarJob(jobId);
+                // In a real app, refetching would update the UI
+                fetchData();
+            };
+
+            const starredJobIds = new Set(starredJobs.map(j => j._id));
+            const jobsToDisplay = view === 'all' ? jobs : starredJobs;
+
+            return (
+                <div>
+                     <div className="flex space-x-4 mb-6 border-b">
+                        <button onClick={() => setView('all')} className={`py-2 px-4 text-lg ${view === 'all' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500'}`}>Browse Jobs</button>
+                        <button onClick={() => setView('starred')} className={`py-2 px-4 text-lg ${view === 'starred' ? 'border-b-2 border-blue-500 text-blue-600 font-semibold' : 'text-gray-500'}`}>My Starred Jobs</button>
+                    </div>
+                    {view === 'all' && <SearchBar onSearch={fetchData} />}
+                    {loading ? <div className="loader mx-auto"></div> : (
+                        jobsToDisplay.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {jobsToDisplay.map(job => (
+                                    <JobCard 
+                                        key={job._id} 
+                                        job={job} 
+                                        onStar={handleStar}
+                                        onUnstar={handleUnstar}
+                                        isStarred={starredJobIds.has(job._id)}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-center text-gray-500 mt-8">No jobs found. Try another search or check back later!</p>
+                        )
+                    )}
+                </div>
+            );
+        }
+
+        // --- MAIN APP ---
+        function App() {
+            return (
+                <div>
+                    <nav className="bg-white shadow-md p-4 flex justify-between items-center">
+                        <h1 className="text-xl font-bold text-gray-800">Job Portal</h1>
+                    </nav>
+                    <main className="p-8">
+                        <CandidateDashboard />
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

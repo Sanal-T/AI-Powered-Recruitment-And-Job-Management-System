@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- REAL API LAYER for ADMIN ---
+        const API_URL = "http://127.0.0.1:8000";
+        // Using the token you provided.
+        const AUTH_TOKEN ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTc1Njc0NzAzMn0.hYApPOZRLrW5-IguPvkhF0CmkrcopNxHN4KizkaI9_4";
+
+
+        const api = {
+            getAdminJobs: async (token, searchTerm = '') => {
+                const response = await fetch(`${API_URL}/admin/jobs?search=${encodeURIComponent(searchTerm)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error("Failed to fetch admin jobs");
+                return response.json();
+            },
+            getAdminStarredJobs: async (token) => {
+                const response = await fetch(`${API_URL}/admin/starred-jobs`, {
+                     headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error("Failed to fetch starred jobs");
+                return response.json();
+            },
+            analyzeJobWithGemini: async (description) => {
+                const apiKey = ""; // Handled by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                
+                const prompt = `Based on the following job description, provide a JSON object with two keys: 
+                1. "summary": A concise one-paragraph summary of the role.
+                2. "skills": An array of the top 5-7 most important skills or technologies mentioned.
+
+                Job Description:
+                "${description}"`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                    }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text;
+                return JSON.parse(text);
+            }
+        };
+
+        // --- COMPONENTS ---
+
+        const SearchIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5 text-gray-500"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        );
+
+        const StarIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-500 h-6 w-6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        );
+
+        function JobAnalysisModal({ job, onClose }) {
+            const [analysis, setAnalysis] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                if (job) {
+                    setLoading(true);
+                    setError(null);
+                    api.analyzeJobWithGemini(job.description)
+                        .then(data => setAnalysis(data))
+                        .catch(err => {
+                            console.error("Gemini API error:", err);
+                            setError("Could not analyze job description.");
+                        })
+                        .finally(() => setLoading(false));
+                }
+            }, [job]);
+
+            if (!job) return null;
+
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-2xl font-bold">{job.title}</h2>
+                            <button onClick={onClose} className="text-2xl font-bold">&times;</button>
+                        </div>
+                        <div className="mb-6">
+                            <h3 className="text-lg font-semibold mb-2 text-gray-700">Full Description</h3>
+                            <p className="text-gray-600 bg-gray-50 p-3 rounded-md">{job.description}</p>
+                        </div>
+                        <hr className="my-4" />
+                        <div>
+                            <h3 className="text-xl font-semibold mb-3 text-gray-800">✨ AI Analysis</h3>
+                            {loading && <div className="loader mx-auto"></div>}
+                            {error && <p className="text-red-500">{error}</p>}
+                            {analysis && (
+                                <div>
+                                    <div className="mb-4">
+                                        <h4 className="font-semibold text-gray-700">Summary</h4>
+                                        <p className="text-gray-600">{analysis.summary}</p>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-700">Key Skills</h4>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {analysis.skills.map(skill => (
+                                                <span key={skill} className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">{skill}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- DASHBOARD PAGE ---
+        function AdminDashboard() {
+            const [jobs, setJobs] = useState([]);
+            const [starredJobs, setStarredJobs] = useState([]);
+            const [searchTerm, setSearchTerm] = useState("");
+            const [selectedJob, setSelectedJob] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                setLoading(true);
+                setError(null);
+                Promise.all([
+                    api.getAdminJobs(AUTH_TOKEN, searchTerm),
+                    api.getAdminStarredJobs(AUTH_TOKEN)
+                ]).then(([jobsData, starredData]) => {
+                    setJobs(jobsData);
+                    setStarredJobs(starredData);
+                }).catch(err => {
+                    console.error("Failed to fetch data:", err);
+                    setError("Could not load data. Please ensure the backend server is running and you have a valid token.");
+                }).finally(() => {
+                    setLoading(false);
+                });
+            }, [searchTerm]);
+
+            return (
+                <div className="p-6">
+                    <JobAnalysisModal job={selectedJob} onClose={() => setSelectedJob(null)} />
+                    
+                    <div className="flex items-center mb-6 border-b pb-4">
+                        <SearchIcon />
+                        <input
+                            type="text"
+                            placeholder="Search jobs..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="p-2 border rounded-md w-full"
+                        />
+                    </div>
+                    
+                    {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
+                    
+                    {loading ? <div className="loader mx-auto"></div> : (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Job List Column */}
+                            <div className="lg:col-span-2">
+                                <h2 className="text-2xl font-semibold mb-4">All Jobs</h2>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {jobs.map((job) => (
+                                        <div key={job._id} className="bg-white p-4 rounded-lg shadow-md border hover:shadow-lg transition-shadow flex flex-col">
+                                            <div className="flex-grow">
+                                                <h3 className="font-bold text-lg">{job.title}</h3>
+                                                <p className="text-sm text-gray-600">{job.company}</p>
+                                                <p className="text-xs text-gray-500 mb-3">{job.location}</p>
+                                            </div>
+                                            
+                                            {/* --- START: UPDATED BUTTONS SECTION --- */}
+                                            <div className="mt-4 flex items-center gap-2">
+                                                <button
+                                                    className="flex-1 bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600 text-sm"
+                                                    onClick={() => setSelectedJob(job)}
+                                                >
+                                                    Analyze Job ✨
+                                                </button>
+                                                {/* --- ADDED THIS LINK, STYLED AS A BUTTON --- */}
+                                                <a
+                                                    href={job.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex-1 bg-gray-500 text-white px-3 py-2 rounded-md hover:bg-gray-600 text-sm text-center"
+                                                >
+                                                    View Posting
+                                                </a>
+                                            </div>
+                                            {/* --- END: UPDATED BUTTONS SECTION --- */}
+
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Starred Jobs Column */}
+                            <div>
+                                <h2 className="text-2xl font-semibold mb-4">⭐ Starred Jobs</h2>
+                                <div className="grid gap-4">
+                                    {starredJobs.map((item, idx) => (
+                                        <div key={idx} className="bg-white p-4 rounded-lg shadow-md border">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="font-bold">{item.job.title}</h3>
+                                                    <p className="text-xs text-gray-500">
+                                                        Starred by: {item.user}
+                                                    </p>
+                                                </div>
+                                                <StarIcon />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // --- MAIN APP ---
+        function App() {
+            return (
+                <div>
+                    <nav className="bg-white shadow-md p-4 flex justify-between items-center">
+                        <h1 className="text-xl font-bold text-gray-800">Job Portal - Admin View</h1>
+                    </nav>
+                    <main>
+                        <AdminDashboard />
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

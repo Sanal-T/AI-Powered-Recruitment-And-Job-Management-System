@@ -5,3 +5,4 @@ client = AsyncIOMotorClient(MONGO_URI)
 db = client.job_database
 jobs_collection = db.jobs
 
+starred_jobs_collection = db.starred_jobs

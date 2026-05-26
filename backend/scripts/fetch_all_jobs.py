@@ -3,18 +3,19 @@ import os
 import asyncio
 import datetime
 
+# This allows the script to import from the parent 'backend' directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from job_queries import QUERIES
 from external.jsearch_client import fetch_jobs_from_jsearch
 from external.adzuna_client import fetch_jobs_from_adzuna
-from scraper.remotive_scraper import fetch_remotive_jobs
 from database import jobs_collection
 
 async def store_jobs(query, region):
+    """Fetches jobs from JSearch and Adzuna for a given query and region."""
     print(f"\n🔎 Fetching JSearch jobs for {query} in {region}")
-    jobs_jsearch = fetch_jobs_from_jsearch(query=query, location=region)
-    jobs_jsearch = [standardize_job(job, region, "JSearch") for job in jobs_jsearch]
+    jobs_jsearch_raw = fetch_jobs_from_jsearch(query=query, location=region)
+    jobs_jsearch = [standardize_job(job, region, "JSearch") for job in jobs_jsearch_raw]
     await insert_new_jobs(jobs_jsearch)
 
     print(f"\n🔎 Fetching Adzuna jobs for {query} in {region}")
@@ -23,23 +24,18 @@ async def store_jobs(query, region):
     jobs_adzuna = [standardize_job(job, region, "Adzuna") for job in jobs_adzuna_raw]
     await insert_new_jobs(jobs_adzuna)
 
-    print(f"\n🔎 Fetching Remotive jobs for {query}")
-    jobs_remotive_raw = fetch_remotive_jobs(search_term=query)
-    jobs_remotive = [standardize_job_from_remotive(job, region) for job in jobs_remotive_raw]
-    await insert_new_jobs(jobs_remotive)
-
 def standardize_job(job, region, source):
+    """Converts a job from an API into our standard database format."""
     return {
         "title": job.get("title", "No title"),
         "company": job.get("company", "Unknown"),
         "location": job.get("location", "Unknown"),
         "description": job.get("description", ""),
         "url": job.get("url", ""),
-        "tags": job.get("tags", []),
-        "job_type": job.get("job_type", "Unknown"),
         "region": region,
         "source": source,
-        "posted_date": job.get("posted_date", datetime.datetime.utcnow())
+        "posted_date": job.get("posted_date", datetime.datetime.utcnow()),
+        "salary": job.get("salary")
     }
 
 def standardize_job_from_remotive(job, region):
@@ -65,6 +61,7 @@ def standardize_job_from_remotive(job, region):
     }
 
 async def insert_new_jobs(jobs):
+    """Inserts a list of jobs into the database, avoiding duplicates."""
     for job in jobs:
         if not job.get("url"):
             print(f"❌ Skipped job with missing URL")
@@ -73,27 +70,31 @@ async def insert_new_jobs(jobs):
         exists = await jobs_collection.find_one({"url": job["url"]})
         if not exists:
             await jobs_collection.insert_one(job)
-            print(f"✅ Stored: {job.get('title', 'No title')} at {job.get('company', 'Unknown')} ({job.get('source', 'Unknown')})")
+            print(f"✅ Stored: {job.get('title')} at {job.get('company')} ({job.get('source')})")
         else:
-            print(f"⚠️ Skipped (duplicate): {job.get('title', 'No title')} ({job.get('source', 'Unknown')})")
+            print(f"⚠️ Skipped (duplicate): {job.get('title')} ({job.get('source')})")
 
 async def print_all_jobs(region=None):
+    """Prints a summary of jobs in the database for a given region."""
     query = {}
     if region:
         query["region"] = region
     jobs = await jobs_collection.find(query).to_list(length=1000)
     print(f"\n🧾 Jobs in {region or 'All Regions'}:")
     for job in jobs:
-        print(f"📌 {job.get('title', 'No title')} at {job.get('company', 'Unknown')} [{job.get('source', 'Unknown')}]")
+        print(f"📌 {job.get('title')} at {job.get('company')} [{job.get('source')}]")
 
 if __name__ == "__main__":
-    async def main():
-        for query in QUERIES:
-            await store_jobs(query, "Thrissur")
-        await print_all_jobs(region="Thrissur")
+    # --- Define all the locations you want to fetch here ---
+    LOCATIONS_TO_FETCH = ["Thrissur", "Kochi", "Ernakulam"]
 
-        for query in QUERIES:
-            await store_jobs(query, "KOCHI")
-        await print_all_jobs(region="KOCHI")
+    async def main():
+        for location in LOCATIONS_TO_FETCH:
+            print(f"\n=================================================")
+            print(f"   STARTING FETCH FOR LOCATION: {location.upper()}   ")
+            print(f"=================================================\n")
+            for query in QUERIES:
+                await store_jobs(query, location)
+            await print_all_jobs(region=location)
 
     asyncio.run(main())
